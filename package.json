@@ -1,0 +1,9 @@
+{
+  "name": "EML to PDF converter",
+  "version": "0.1",
+  "dependencies": {
+    "envelope": "^1.0.7",
+    "html-pdf": "^2.2.0",
+    "quoted-printable": "^1.0.1"
+  }
+}
