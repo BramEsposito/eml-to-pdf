@@ -1,9 +1,38 @@
 {
   "name": "EML to PDF converter",
-  "version": "0.1",
+  "version": "1.0.0",
+  "description": "Convert EML files to PDF, save attachments, rename EML files",
+  "main": "index.js",
   "dependencies": {
-    "envelope": "^1.0.7",
+    "async-foreach": "^0.1.3",
+    "dateformat": "^3.0.2",
+    "envelope": "^1.0.9",
+    "handlebars": "^4.0.11",
     "html-pdf": "^2.2.0",
-    "quoted-printable": "^1.0.1"
-  }
+    "html-entities": "^1.2.1",
+    "html-pdf-chrome": "^0.3.0",
+    "npm-cid": "^0.1.3",
+    "path": "^0.12.7",
+    "quoted-printable": "^1.0.1",
+    "sanitize-filename": "^1.6.1",
+    "strtotime": "^1.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BramEsposito/eml-to-pdf.git"
+  },
+  "keywords": [
+    "email",
+    "pdf"
+  ],
+  "author": "Bram Esposito",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BramEsposito/eml-to-pdf/issues"
+  },
+  "homepage": "https://github.com/BramEsposito/eml-to-pdf#readme"
 }
