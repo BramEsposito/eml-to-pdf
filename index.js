@@ -49,7 +49,6 @@ module.exports = Eml2Pdf = function (filename) {
                     newname = newname + "_" + i;
                 }
     
-                console.log(newname);
                 fs.renameSync(this.emlfilename, newname + ".eml");
                 this.emlfilename = newname;
                 resolve(newname);
@@ -81,7 +80,6 @@ module.exports = Eml2Pdf = function (filename) {
                             // run callback when no child Envelopes in this Envelope
                             callback(envelope[prop]).then(function () {
                                 callbacksProcessed++;
-                                console.log(callbacksProcessed + " callbacks processed, " + callbacksStarted + " callbacks started");
                                 done();
                             });
 
@@ -98,7 +96,6 @@ module.exports = Eml2Pdf = function (filename) {
             eml2pdf.getEnvelope();
 
             eml2pdf.parseEnvelope(eml2pdf.email,eml2pdf.checkForAttachment).then(function() {
-                console.log("end saving attachments");
                 resolve();
             });
         });
@@ -119,7 +116,6 @@ module.exports = Eml2Pdf = function (filename) {
                         console.log(err);
                         reject();
                     } else {
-                        console.log("attachment: " + filename + " was saved!");
                         resolve();
                     }
                 });
@@ -136,8 +132,6 @@ module.exports = Eml2Pdf = function (filename) {
 
             function getMessagebyFormat(envelope) {
                 return new Promise((resolve, reject) => {
-                    console.log(envelope.header.contentType.mime);
-                    // var e = envelope;
                     switch (envelope.header.contentType.mime) {
                         case "text/plain":
                             eml2pdf.textmessage = envelope[0];
@@ -186,7 +180,6 @@ module.exports = Eml2Pdf = function (filename) {
                 let pdffilename = eml2pdf.getEmlPath() + ".pdf";
 
                 eml2pdf.writepdffile(message, pdffilename, options).then((result) => {
-                    console.log(result);
                     resolve(result);
                 });
             });
@@ -239,7 +232,6 @@ module.exports = Eml2Pdf = function (filename) {
             // Generate PDF
             pdf.create(html, options).toFile(pdffilename, function (err, res) {
                 if (err) return reject(err);
-                console.log("PDF version: " + res.filename+" was saved!"); // { filename: '/app/test.pdf' }
                 resolve(res);
             });
         });
