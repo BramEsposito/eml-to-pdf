@@ -5,7 +5,7 @@ var path = require('path');
 var sanitize = require("sanitize-filename");
 var dateFormat = require('dateformat');
 var cid = require('npm-cid');
-var Handlebars = require('Handlebars');
+var Handlebars = require('handlebars');
 const Entities = require('html-entities').AllHtmlEntities;
 
 module.exports = Eml2Pdf = function (filename) {
