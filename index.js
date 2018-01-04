@@ -177,7 +177,7 @@ module.exports = Eml2Pdf = function (filename) {
                     height: "396mm", // * 4/3 // avoid pantomjs bug
                     border: "1cm"
                 };
-                let pdffilename = eml2pdf.getEmlPath() + ".pdf";
+                let pdffilename = eml2pdf.emlfilename + ".pdf";
 
                 eml2pdf.writepdffile(message, pdffilename, options).then((result) => {
                     resolve(result);
