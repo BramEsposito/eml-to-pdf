@@ -70,19 +70,26 @@ module.exports = Eml2Pdf = function (filename) {
                 if (callbacksStarted === callbacksProcessed) resolveParseEnvelope();
             };
             var iterator = function(envelope,callback) {
-                for (let prop in envelope) {
-                    if (envelope[prop]['header'] !== undefined) {
-                        // if this Envelope contains more Envelopes
-                        if (envelope[prop]['0'] instanceof Envelope) {
-                            iterator(envelope[prop], callback);
-                        } else {
-                            callbacksStarted++;
-                            // run callback when no child Envelopes in this Envelope
-                            callback(envelope[prop]).then(function () {
-                                callbacksProcessed++;
-                                done();
-                            });
+                if (envelope.header.contentType === undefined) {
+                    // plaintext only mail
+                    eml2pdf.textmessage = envelope[0];
+                    done();
+                } else {
+                    // most likely multipart mail
+                    for (let prop in envelope) {
+                        if (envelope[prop]['header'] !== undefined) {
+                            // if this Envelope contains more Envelopes
+                            if (envelope[prop]['0'] instanceof Envelope) {
+                                iterator(envelope[prop], callback);
+                            } else {
+                                callbacksStarted++;
+                                // run callback when no child Envelopes in this Envelope
+                                callback(envelope[prop]).then(function () {
+                                    callbacksProcessed++;
+                                    done();
+                                });
 
+                            }
                         }
                     }
                 }
