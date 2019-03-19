@@ -77,19 +77,27 @@ module.exports = Eml2Pdf = function (filename) {
                 } else {
                     // most likely multipart mail
                     for (let prop in envelope) {
-                        if (envelope[prop]['header'] !== undefined) {
-                            // if this Envelope contains more Envelopes
-                            if (envelope[prop]['0'] instanceof Envelope) {
-                                iterator(envelope[prop], callback);
-                            } else {
-                                callbacksStarted++;
-                                // run callback when no child Envelopes in this Envelope
-                                callback(envelope[prop]).then(function () {
-                                    callbacksProcessed++;
-                                    done();
-                                });
 
+                        if (Object.keys(envelope).length > 2) {
+
+                            if (envelope[prop]['header'] !== undefined) {
+                                // if this Envelope contains more Envelopes
+                                if (envelope[prop]['0'] instanceof Envelope) {
+                                    iterator(envelope[prop], callback);
+                                } else {
+                                    callbacksStarted++;
+                                    // run callback when no child Envelopes in this Envelope
+                                    callback(envelope[prop]).then(function () {
+                                        callbacksProcessed++;
+                                        done();
+                                    });
+
+                                }
                             }
+                        } else {
+                            callback(envelope).then(function () {
+                                done();
+                            });
                         }
                     }
                 }
