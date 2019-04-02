@@ -21,6 +21,12 @@ module.exports = Eml2Pdf = function (filename) {
     this.getEnvelope = function() {
         if (eml2pdf.email != undefined) return;
         var data = fs.readFileSync(this.emlfilename);
+        data = data.toString();
+        if (data.indexOf("\r\n") === -1) {
+            // fix newlines in eml files from apple mail app
+            data = data.replace(/\n/gi,"\r\n");
+        }
+
         eml2pdf.email = new Envelope(data);
     }
 
