@@ -5,8 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "dateformat": "^3.0.3",
-    "envelope": "^1.0.10",
-    "handlebars": "^4.1.0",
+    "envelope": "^2.0.2",
+    "handlebars": "^4.1.1",
     "html-entities": "^1.2.1",
     "html-pdf": "^2.2.0",
     "npm-cid": "^0.1.4",
