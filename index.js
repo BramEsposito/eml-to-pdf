@@ -35,7 +35,7 @@ function recurseDir(files) {
     console.log(`Processing ${emlFile}`);
 
     convertToPDF(emlFile).finally(() => {
-      recurse(files.slice(1));
+      recurseDir(files.slice(1));
     });
   }
 }
