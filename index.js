@@ -242,7 +242,7 @@ module.exports = Eml2Pdf = function (filename) {
 
     this.inlineImages = function() {
         if (eml2pdf.attachments.length > 0){
-            return cid(eml2pdf.htmlmessage, eml2pdf.attachments);
+            return cid(eml2pdf.htmlmessage, eml2pdf.attachments.map((attachment, i) => ({ ...attachment, fileName: attachment.fileName || i.toString() })));
         } else {
             return eml2pdf.htmlmessage;
         }
