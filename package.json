@@ -8,7 +8,7 @@
     "envelope": "^2.0.2",
     "handlebars": "^4.1.1",
     "html-entities": "^1.2.1",
-    "html-pdf": "^2.2.0",
+    "html-pdf": "^3.0.1",
     "npm-cid": "^0.1.4",
     "path": "^0.12.7",
     "sanitize-filename": "^1.6.1"
