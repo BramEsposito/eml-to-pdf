@@ -3,17 +3,17 @@
   "version": "1.0.8",
   "description": "Convert EML files to PDF, save attachments, rename EML files",
   "main": "index.js",
+  "type": "module",
   "dependencies": {
-    "dateformat": "^3.0.3",
+    "dateformat": "^5.0.3",
     "envelope": "^2.0.2",
     "handlebars": "^4.1.1",
-    "html-entities": "^1.2.1",
-    "html-pdf": "^2.2.0",
+    "html-entities": "^2.5.2",
+    "html-pdf": "^3.0.1",
     "npm-cid": "^0.1.4",
     "path": "^0.12.7",
     "sanitize-filename": "^1.6.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -30,5 +30,10 @@
   "bugs": {
     "url": "https://github.com/BramEsposito/eml-to-pdf/issues"
   },
-  "homepage": "https://github.com/BramEsposito/eml-to-pdf#readme"
+  "homepage": "https://github.com/BramEsposito/eml-to-pdf#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.5.0",
+    "eslint": "^9.5.0",
+    "globals": "^15.6.0"
+  }
 }

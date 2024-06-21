@@ -1,15 +1,20 @@
-var fs = require( 'fs' );
-var pdf = require( 'html-pdf' );
-var Envelope = require( 'envelope' );
-var path = require('path');
-var sanitize = require("sanitize-filename");
-var dateFormat = require('dateformat');
-var cid = require('npm-cid');
-var Handlebars = require('handlebars');
-const Entities = require('html-entities').AllHtmlEntities;
+import fs from 'fs' ;
+import pdf from 'html-pdf' ;
+import Envelope from 'envelope';
+import path from 'path';
+import sanitize from "sanitize-filename";
+import dateFormat from 'dateformat';
+import cid from 'npm-cid';
+import Handlebars from 'handlebars';
+// const Entities = require('html-entities').AllHtmlEntities;
+import {encode} from 'html-entities';
 
-module.exports = Eml2Pdf = function (filename) {
-    const entities = new Entities();
+const debug = function(msg) {
+    console.log(msg)
+}
+
+export default function (filename) {
+
     var eml2pdf = this;
     this.email;
     this.emlfilename = filename;
@@ -33,20 +38,20 @@ module.exports = Eml2Pdf = function (filename) {
     this.getEmlPath = function() {
         return path.dirname(eml2pdf.emlfilename) + "/"
             + sanitize(
-                dateFormat(eml2pdf.email['header']['date'], "yyyy.mm.dd") + " - " 
-                + eml2pdf.email['header']['from']['name'] + " - " 
-                + eml2pdf.email['header']['subject']
+                dateFormat(eml2pdf.email['header'].get('date'), "yyyy.mm.dd") + " - "
+                + eml2pdf.email['header'].get('from')[0].name + " - "
+                + eml2pdf.email['header'].get('subject')
             );
     }
 
     this.renameFile = function() {
-        return new Promise((resolve,reject) => {
+        return new Promise((resolve) => {
             eml2pdf.getEnvelope();
 
-            newname = eml2pdf.getEmlPath();
-            
+            let newname = eml2pdf.getEmlPath();
+
             if (this.emlfilename !== newname + ".eml") {
-    
+
                 if (fs.existsSync(newname + ".eml")) {
                     let i = 1;
                     while (fs.existsSync(newname + "_" + i + ".eml")) {
@@ -54,7 +59,7 @@ module.exports = Eml2Pdf = function (filename) {
                     }
                     newname = newname + "_" + i;
                 }
-    
+
                 fs.renameSync(this.emlfilename, newname + ".eml");
                 this.emlfilename = newname;
                 resolve(newname);
@@ -64,9 +69,9 @@ module.exports = Eml2Pdf = function (filename) {
             }
         });
     }
-    
+
     this.parseEnvelope = function(envelope,callback) {
-        return new Promise((resolveParseEnvelope,reject) => {
+        return new Promise((resolveParseEnvelope) => {
             let callbacksStarted = 0;
             let callbacksProcessed = 0;
 
@@ -76,17 +81,28 @@ module.exports = Eml2Pdf = function (filename) {
                 if (callbacksStarted === callbacksProcessed) resolveParseEnvelope();
             };
             var iterator = function(envelope,callback) {
-                if (envelope.header.contentType === undefined) {
+                // for (const prop in envelope) {
+                //     dumpToFile(envelope[prop],prop+".txt");
+                // }
+
+                // console.log("Content-type:", envelope.header.get('content-type') );
+                // console.log("name", envelope.header.get('content-type').name);
+                if (envelope.header.get('content-type').type === undefined) {
                     // plaintext only mail
                     eml2pdf.textmessage = envelope[0];
                     done();
                 } else {
                     // most likely multipart mail
-                    for (let prop in envelope) {
+                    // console.log(Object.keys(envelope));
+                    // Do not parse the header and body of the Envelope
+                    const {header: _, body: __, ...rest} = envelope;
+                    for (let prop in rest) {
 
-                        if (Object.keys(envelope).length > 2) {
+                        if (Object.keys(envelope).length > 2 && prop !== "body") {
+                            // console.log("prop", prop);
 
                             if (envelope[prop]['header'] !== undefined) {
+                                // console.log("ENVELOPE HEADER", envelope[prop].header);
                                 // if this Envelope contains more Envelopes
                                 if (envelope[prop]['0'] instanceof Envelope) {
                                     iterator(envelope[prop], callback);
@@ -99,6 +115,9 @@ module.exports = Eml2Pdf = function (filename) {
                                     });
 
                                 }
+                            } else {
+                                console.log("No header on this envelope prop:", prop)
+                                console.log(envelope[prop]);
                             }
                         } else {
                             callback(envelope).then(function () {
@@ -112,8 +131,13 @@ module.exports = Eml2Pdf = function (filename) {
         });
     };
 
-    this.saveAttachmentsFromEML = function() {
-        return new Promise((resolve,reject) => {
+    this.saveAttachmentsFromEML = async () => {
+        await eml2pdf.getEnvelope();
+        await eml2pdf.parseEnvelope(eml2pdf.email,eml2pdf.checkForAttachment)
+    }
+
+    this.saveAttachmentsFromEML_old = function() {
+        return new Promise((resolve) => {
             eml2pdf.getEnvelope();
 
             eml2pdf.parseEnvelope(eml2pdf.email,eml2pdf.checkForAttachment).then(function() {
@@ -124,15 +148,17 @@ module.exports = Eml2Pdf = function (filename) {
 
     this.checkForAttachment = function(envelope) {
         return new Promise((resolve,reject) => {
-            if (envelope.header.contentType.name) {
-                var filename = envelope.header.contentType.name;
+            debug(eml2pdf.attachments);
+            if (!["text/html", "text/plain", "multipart/related"].includes(envelope.header.get('content-type').type)) {
+                console.log("name", envelope.header);
+                var filename = envelope.header.get('content-disposition').parameters.filename;
                 var filepath = eml2pdf.getEmlPath() + "/";
 
                 if (!fs.existsSync(filepath)) {
                     fs.mkdirSync(filepath);
                 }
 
-                fs.writeFile(filepath + filename, envelope['0'], function (err) {
+                fs.writeFile(filepath + filename, envelope.body.toString(), 'base64', function (err) {
                     if (err) {
                         console.log(err);
                         reject();
@@ -147,19 +173,35 @@ module.exports = Eml2Pdf = function (filename) {
     };
 
      this.convertEMLtoPDF = function(){
-        return new Promise((resolve,reject) => {
+        return new Promise((resolve) => {
             eml2pdf.getEnvelope();
 
 
             function getMessagebyFormat(envelope) {
-                return new Promise((resolve, reject) => {
-                    switch (envelope.header.contentType.mime) {
+                return new Promise((resolve) => {
+                    console.log("MIME type: "+JSON.stringify(envelope.header.get('content-type')));
+                    debug(envelope)
+                    switch (envelope.header.get('content-type').type) {
                         case "text/plain":
-                            eml2pdf.textmessage = envelope[0];
+                            eml2pdf.textmessage = envelope.body.toString();
                             break;
                         case "text/html":
-                            eml2pdf.htmlmessage = envelope[0];
+                            eml2pdf.htmlmessage = envelope.body.toString();
                             break;
+
+                        case "multipart/related":
+                            eml2pdf.htmlmessage = envelope[0].body.toString();
+                            break;
+
+                        case "image/png":
+                            eml2pdf.attachments.push({
+                                fileName: envelope.header.get('content-id'),
+                                contentId: envelope.header.get('content-id').replace('>', '').replace('<', ''),
+                                content: envelope.body.toString()
+                            })
+                            break;
+                        default:
+                            debug ("Unknown MIME type: "+envelope.header.get('content-type').type);
                     }
                     if (
                         envelope.header.contentDisposition &&
@@ -167,25 +209,32 @@ module.exports = Eml2Pdf = function (filename) {
                         envelope['header']['contentId']
                         ) {
                         eml2pdf.attachments.push({
-                            fileName: envelope['header']['contentType']['name'],
-                            contentId: envelope['header']['contentId'].replace('\>', '').replace('\<', ''),
+                            fileName: envelope.header.get('content-type').name,
+                            contentId: envelope['header']['contentId'].replace('>', '').replace('<', ''),
                             content: envelope['0']
                         });
                     }
                     resolve();
                 });
             }
+            if (eml2pdf.email[1].length > 1) {
+                console.log(eml2pdf.email[1][0].body.toString())
+            }
+            // console.log(eml2pdf.email[1][1].body.toString());
 
             eml2pdf.parseEnvelope(eml2pdf.email, getMessagebyFormat).then(() => {
+                let rawsource = "";
                 if (eml2pdf.htmlmessage === undefined) {
+                    debug("Falling back to txt version of message");
                     // settle with plain text version of message
-                    rawsource = '<p>' + entities.encode(eml2pdf.textmessage).replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>") + '</p>';
+                    rawsource = '<p>' + encode(eml2pdf.textmessage).replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>") + '</p>';
                     ;
                 } else {
                     // we have a formatted html message
                     // inline images in the message
                     rawsource = eml2pdf.inlineImages();
                 }
+                console.log(rawsource)
                 eml2pdf.generateEmailHeader();
                 var message = eml2pdf.emailheader;
 
@@ -199,6 +248,8 @@ module.exports = Eml2Pdf = function (filename) {
                     border: "1cm"
                 };
                 let pdffilename = eml2pdf.emlfilename + ".pdf";
+
+                fs.writeFile(eml2pdf.emlfilename + ".txt", message, function(){});
 
                 eml2pdf.writepdffile(message, pdffilename, options).then((result) => {
                     resolve(result);
@@ -224,10 +275,10 @@ module.exports = Eml2Pdf = function (filename) {
 
         var template = Handlebars.compile(source);
         var data = {
-            from: eml2pdf.email.header.from.address,
-            date: eml2pdf.email.header.date,
-            to: eml2pdf.email.header.to.address,
-            subject: eml2pdf.email.header.subject,
+            from: eml2pdf.email.header.get('from')[0].address,
+            date: eml2pdf.email.header.get('date'),
+            to: eml2pdf.email.header.get('to')[0].address,
+            subject: eml2pdf.email.header.get('subject'),
         };
         if (eml2pdf.email.header.cc) {
             data.cc = eml2pdf.email.header.cc.address;
@@ -241,6 +292,7 @@ module.exports = Eml2Pdf = function (filename) {
     }
 
     this.inlineImages = function() {
+        debug("Number of attachments for this message: "+eml2pdf.attachments.length);
         if (eml2pdf.attachments.length > 0){
             return cid(eml2pdf.htmlmessage, eml2pdf.attachments.map((attachment, i) => ({ ...attachment, fileName: attachment.fileName || i.toString() })));
         } else {

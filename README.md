@@ -18,7 +18,9 @@ Rename the eml file using data from the email message in this format: ```yyyy.mm
 Files with the same filename will receive a trailing counter, eg: ```yyyy.mm.dd - from.name - subject_1.eml```.
 
 ```javascript
-var eml2pdf = new Eml2Pdf("filename.eml");
+import Eml2Pdf from "eml-to-pdf";
+
+const eml2pdf = new Eml2Pdf("filename.eml");
 
 eml2pdf.renameFile();
 ```
@@ -30,7 +32,8 @@ eml2pdf.renameFile();
 Save the attachments in the email message to disk. These will be saved along the EML file in a subdirectory named with the naming scheme from ```renameFile```.
 
 ```javascript
-var eml2pdf = new Eml2Pdf("filename.eml");
+import Eml2Pdf from "eml-to-pdf";
+const eml2pdf = new Eml2Pdf("filename.eml");
 
 eml2pdf.saveAttachmentsFromEML();
 ```
@@ -42,7 +45,8 @@ eml2pdf.saveAttachmentsFromEML();
 A pdf file will be saved to disk with the naming scheme from ```renameFile``` . It will have a header containing time, sender, receiver, Reply-to, CC and subject.
 
 ```javascript
-var eml2pdf = new Eml2Pdf("filename.eml");
+import Eml2Pdf from "eml-to-pdf";
+const  eml2pdf = new Eml2Pdf("filename.eml");
 
 eml2pdf.convertEMLtoPDF();
 ```
