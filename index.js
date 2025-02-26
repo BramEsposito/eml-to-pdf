@@ -217,7 +217,7 @@ export default function (filename) {
                     resolve();
                 });
             }
-            if (eml2pdf.email[1].length > 1) {
+            if (eml2pdf.email.length > 1 && eml2pdf.email[1].length > 1) {
                 console.log(eml2pdf.email[1][0].body.toString())
             }
             // console.log(eml2pdf.email[1][1].body.toString());
