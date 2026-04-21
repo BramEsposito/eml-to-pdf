@@ -173,6 +173,15 @@ export default class Eml2Pdf {
         return this._writepdffile(html, pdffilename)
     }
 
+    _decodeBody(envelope) {
+        const cte = envelope.header.get('content-transfer-encoding')?.toLowerCase().trim()
+        const raw = envelope.body.toString()
+        if (cte === 'base64') {
+            return Buffer.from(raw.replace(/\s/g, ''), 'base64').toString('utf8')
+        }
+        return raw
+    }
+
     _getMessageByFormat(envelope) {
         return new Promise((resolve) => {
             const contentType = envelope.header.get('content-type')
@@ -180,37 +189,22 @@ export default class Eml2Pdf {
 
             switch (contentType.type) {
                 case 'text/plain':
-                    this.textmessage = envelope.body.toString()
+                    this.textmessage = this._decodeBody(envelope)
                     break
                 case 'text/html':
-                    this.htmlmessage = envelope.body.toString()
-                    break
-                case 'multipart/related':
-                    this.htmlmessage = envelope[0].body.toString()
+                    this.htmlmessage = this._decodeBody(envelope)
                     break
                 default:
                     if (contentType.type?.startsWith('image/')) {
                         const contentId = envelope.header.get('content-id')
                         this.attachments.push({
-                            fileName: contentId,
+                            fileName: contentType.parameters?.name ?? contentId?.replace(/[<>]/g, ''),
                             contentId: contentId?.replace(/[<>]/g, ''),
                             content: envelope.body.toString(),
                         })
                     } else {
                         this._log('Unknown MIME type: ' + contentType.type)
                     }
-            }
-
-            if (
-                envelope.header.contentDisposition &&
-                ['attachment', 'inline'].includes(envelope.header.contentDisposition.mime) &&
-                envelope.header.contentId
-            ) {
-                this.attachments.push({
-                    fileName: contentType.name,
-                    contentId: envelope.header.contentId.replace(/[<>]/g, ''),
-                    content: envelope[0],
-                })
             }
 
             resolve()

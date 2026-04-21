@@ -1,6 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(node *)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "sentry"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }

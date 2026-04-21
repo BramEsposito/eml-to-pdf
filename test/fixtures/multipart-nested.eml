@@ -1,0 +1,17 @@
+MIME-Version: 1.0
+Date: Mon, 15 Mar 2024 10:00:00 +0000
+From: Jane Smith <jane@example.com>
+To: John Doe <john@example.com>
+Subject: Nested Multipart Email
+Content-Type: multipart/mixed; boundary="OUTER"
+
+--OUTER
+Content-Type: multipart/related; boundary="INNER"
+
+--INNER
+Content-Type: text/html; charset=UTF-8
+
+<html><body><p>Nested multipart.</p></body></html>
+
+--INNER--
+--OUTER--

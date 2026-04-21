@@ -217,6 +217,76 @@ describe('convertEMLtoPDF', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Inline images
+// ---------------------------------------------------------------------------
+
+describe('convertEMLtoPDF with inline image', () => {
+    it('inlines the image and passes CID-replaced HTML to puppeteer', async () => {
+        const eml = new Eml2Pdf(fixture('with-inline-image.eml'))
+        const result = await eml.convertEMLtoPDF()
+        expect(result.filename).toMatch(/\.pdf$/)
+        expect(mockSetContent).toHaveBeenCalledOnce()
+        const [html] = mockSetContent.mock.calls[0]
+        // cid() replaces src="cid:img1@example.com" with a data URI
+        expect(html).toContain('data:image/png;base64,')
+    })
+
+    it('populates attachments with the image part', async () => {
+        const eml = new Eml2Pdf(fixture('with-inline-image.eml'))
+        await eml.convertEMLtoPDF()
+        expect(eml.attachments).toHaveLength(1)
+        expect(eml.attachments[0].contentId).toBe('img1@example.com')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// No-filename attachment skip
+// ---------------------------------------------------------------------------
+
+describe('saveAttachmentsFromEML with no-filename attachment', () => {
+    it('skips an attachment that has no filename and no content-type name', async () => {
+        const eml = new Eml2Pdf(fixture('with-no-filename-attachment.eml'), { logger: vi.fn() })
+        await eml.saveAttachmentsFromEML()
+        // No subdirectory should be created since the only attachment was skipped
+        const attachDir = path.join(tmpDir, '2024.03.15 - Jane Smith - No Filename Attachment')
+        expect(fs.existsSync(attachDir)).toBe(false)
+    })
+
+    it('calls the logger when skipping a no-filename attachment', async () => {
+        const logger = vi.fn()
+        const eml = new Eml2Pdf(fixture('with-no-filename-attachment.eml'), { logger })
+        await eml.saveAttachmentsFromEML()
+        expect(logger).toHaveBeenCalledWith(expect.stringContaining('Skipping'))
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Nested multipart (exercises the recursive iterate path)
+// ---------------------------------------------------------------------------
+
+describe('convertEMLtoPDF with nested multipart', () => {
+    it('extracts HTML from a multipart/mixed → multipart/related structure', async () => {
+        const eml = new Eml2Pdf(fixture('multipart-nested.eml'))
+        await eml.convertEMLtoPDF()
+        const [html] = mockSetContent.mock.calls[0]
+        expect(html).toContain('Nested multipart')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Unknown MIME type log
+// ---------------------------------------------------------------------------
+
+describe('convertEMLtoPDF with unknown MIME type', () => {
+    it('logs unknown MIME types and still produces a PDF', async () => {
+        const logger = vi.fn()
+        const eml = new Eml2Pdf(fixture('with-attachment.eml'), { logger })
+        await eml.convertEMLtoPDF()
+        expect(logger).toHaveBeenCalledWith(expect.stringContaining('Unknown MIME type'))
+        expect(mockSetContent).toHaveBeenCalledOnce()
+    })
+})
+// ---------------------------------------------------------------------------
 // Apple Mail LF-only normalisation
 // ---------------------------------------------------------------------------
 

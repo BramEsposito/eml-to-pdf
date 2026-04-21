@@ -13,9 +13,10 @@
     "sanitize-filename": "^1.6.3"
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test": "vitest run --exclude test/integration.test.js",
+    "test:watch": "vitest --exclude test/integration.test.js",
+    "test:coverage": "vitest run --coverage --exclude test/integration.test.js",
+    "test:integration": "vitest run test/integration.test.js"
   },
   "repository": {
     "type": "git",

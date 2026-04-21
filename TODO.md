@@ -32,5 +32,4 @@
 
 ## Testing
 
-- [x] Add a test suite (vitest) with fixture `.eml` files covering plain-text, HTML-only, multipart/alternative, attachments, LF-only (Apple Mail), duplicate filename collision — 20 tests, 85% statement coverage
-- [ ] Add fixture for multipart with inline PNG to cover `_inlineImages` / `_writepdffile` paths (currently uncovered)
+- [x] Add a test suite (vitest) with fixture `.eml` files covering plain-text, HTML-only, multipart/alternative, multipart/nested, attachments, inline images, no-filename attachments, LF-only (Apple Mail), duplicate filename collision — 26 tests, 97% line coverage
