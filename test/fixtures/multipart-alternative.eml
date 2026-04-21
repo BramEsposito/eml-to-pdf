@@ -1,0 +1,18 @@
+MIME-Version: 1.0
+Date: Mon, 15 Mar 2024 10:00:00 +0000
+From: Jane Smith <jane@example.com>
+To: John Doe <john@example.com>
+Subject: Multipart Email
+Content-Type: multipart/alternative; boundary="BOUNDARY"
+
+--BOUNDARY
+Content-Type: text/plain; charset=UTF-8
+
+Plain text version.
+
+--BOUNDARY
+Content-Type: text/html; charset=UTF-8
+
+<html><body><p>HTML version.</p></body></html>
+
+--BOUNDARY--

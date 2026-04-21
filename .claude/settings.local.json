@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "sentry"
+  ],
+  "enableAllProjectMcpServers": true
+}

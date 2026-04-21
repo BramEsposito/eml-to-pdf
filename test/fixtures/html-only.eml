@@ -1,0 +1,8 @@
+MIME-Version: 1.0
+Date: Mon, 15 Mar 2024 10:00:00 +0000
+From: Jane Smith <jane@example.com>
+To: John Doe <john@example.com>
+Subject: HTML Email
+Content-Type: text/html; charset=UTF-8
+
+<html><body><p>This is the HTML body.</p></body></html>

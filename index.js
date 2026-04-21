@@ -61,10 +61,10 @@ export default function (filename) {
                 }
 
                 fs.renameSync(this.emlfilename, newname + ".eml");
-                this.emlfilename = newname;
+                this.emlfilename = newname + ".eml";
                 resolve(newname);
             } else {
-                this.emlfilename = newname;
+                this.emlfilename = newname + ".eml";
                 resolve(newname);
             }
         });
@@ -81,28 +81,29 @@ export default function (filename) {
                 if (callbacksStarted === callbacksProcessed) resolveParseEnvelope();
             };
             var iterator = function(envelope,callback) {
-                // for (const prop in envelope) {
-                //     dumpToFile(envelope[prop],prop+".txt");
-                // }
-
-                // console.log("Content-type:", envelope.header.get('content-type') );
-                // console.log("name", envelope.header.get('content-type').name);
                 if (envelope.header.get('content-type').type === undefined) {
-                    // plaintext only mail
+                    // plaintext only mail with no Content-Type
                     eml2pdf.textmessage = envelope[0];
                     done();
                 } else {
-                    // most likely multipart mail
-                    // console.log(Object.keys(envelope));
                     // Do not parse the header and body of the Envelope
                     const {header: _, body: __, ...rest} = envelope;
+
+                    if (Object.keys(rest).length === 0) {
+                        // simple non-multipart envelope (text/plain or text/html, no child parts)
+                        callbacksStarted++;
+                        callback(envelope).then(function () {
+                            callbacksProcessed++;
+                            done();
+                        });
+                        return;
+                    }
+
                     for (let prop in rest) {
 
                         if (Object.keys(envelope).length > 2 && prop !== "body") {
-                            // console.log("prop", prop);
 
                             if (envelope[prop]['header'] !== undefined) {
-                                // console.log("ENVELOPE HEADER", envelope[prop].header);
                                 // if this Envelope contains more Envelopes
                                 if (envelope[prop]['0'] instanceof Envelope) {
                                     iterator(envelope[prop], callback);
@@ -280,12 +281,14 @@ export default function (filename) {
             to: eml2pdf.email.header.get('to')[0].address,
             subject: eml2pdf.email.header.get('subject'),
         };
-        if (eml2pdf.email.header.cc) {
-            data.cc = eml2pdf.email.header.cc.address;
+        const ccList = eml2pdf.email.header.get('cc');
+        if (ccList && ccList.length > 0) {
+            data.cc = ccList.map(c => c.address).join(', ');
         }
 
-        if (eml2pdf.email.header.replyTo) {
-            data.replyTo = eml2pdf.email.header.replyTo.address;
+        const replyToList = eml2pdf.email.header.get('reply-to');
+        if (replyToList && replyToList.length > 0) {
+            data.replyTo = replyToList.map(c => c.address).join(', ');
         }
 
         eml2pdf.emailheader = template(data);
