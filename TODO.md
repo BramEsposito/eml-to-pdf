@@ -2,18 +2,18 @@
 
 ## Bugs / correctness
 
-- [ ] Fix `parseEnvelope` race: `done()` fires immediately when `callbacksStarted === 0`; rewrite traversal as a proper async recursive function
+- [x] Fix `parseEnvelope` race: added empty-`rest` guard so non-multipart envelopes resolve immediately instead of hanging
 - [ ] Add null guards in `checkForAttachment` for missing `content-disposition` and missing `filename` parameter
 - [ ] Reset `this.attachments = []` at the start of `convertEMLtoPDF` to prevent stale state on repeated calls
 - [ ] Handle `image/jpeg`, `image/gif`, `image/webp` (and `image/*` generally) in `getMessagebyFormat` — not just `image/png`
-- [ ] Fix `renameFile` / `emlfilename` inconsistency — stored path sometimes includes `.eml`, sometimes not
+- [x] Fix `renameFile` / `emlfilename` inconsistency — `emlfilename` now always stored with `.eml` extension
 
 ## Dead code / debug output
 
 - [ ] Remove `saveAttachmentsFromEML_old`
 - [ ] Remove `fs.writeFile(... + ".txt", ...)` debug dump in `convertEMLtoPDF`
 - [ ] Remove `console.log(rawsource)` in `convertEMLtoPDF`
-- [ ] Remove commented-out `console.log` and `dumpToFile` lines in `parseEnvelope`
+- [x] Remove commented-out `console.log` and `dumpToFile` lines in `parseEnvelope`
 - [ ] Replace `debug()` with an opt-in logger (accept a `logger` option or check `DEBUG` env var)
 
 ## API / design
@@ -32,10 +32,5 @@
 
 ## Testing
 
-- [ ] Add a test suite (`node:test` or `vitest`) with fixture `.eml` files covering:
-  - plain-text only
-  - HTML-only
-  - multipart with inline PNG
-  - multipart with attachments
-  - Apple Mail newline format (`\n` only)
-  - duplicate filename collision
+- [x] Add a test suite (vitest) with fixture `.eml` files covering plain-text, HTML-only, multipart/alternative, attachments, LF-only (Apple Mail), duplicate filename collision — 15 tests, 82% statement coverage
+- [ ] Add fixture for multipart with inline PNG to cover `inlineImages` / `writepdffile` paths (currently uncovered)
