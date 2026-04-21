@@ -1,315 +1,268 @@
-import fs from 'fs' ;
-import pdf from 'html-pdf' ;
-import Envelope from 'envelope';
-import path from 'path';
-import sanitize from "sanitize-filename";
-import dateFormat from 'dateformat';
-import cid from 'npm-cid';
-import Handlebars from 'handlebars';
-// const Entities = require('html-entities').AllHtmlEntities;
-import {encode} from 'html-entities';
+import fs from 'node:fs'
+import path from 'node:path'
+import sanitize from 'sanitize-filename'
+import dateFormat from 'dateformat'
+import cid from 'npm-cid'
+import { encode } from 'html-entities'
+import Envelope from 'envelope'
+import puppeteer from 'puppeteer'
 
-const debug = function(msg) {
-    console.log(msg)
+const DEFAULT_PDF_OPTIONS = {
+    width: '280mm',
+    height: '396mm',
+    margin: { top: '1cm', right: '1cm', bottom: '1cm', left: '1cm' },
 }
 
-export default function (filename) {
+export default class Eml2Pdf {
 
-    var eml2pdf = this;
-    this.email;
-    this.emlfilename = filename;
-    this.emailheader;
-    this.textmessage;
-    this.htmlmessage;
-    this.attachments = Array();
+    constructor(filename, options = {}) {
+        this.emlfilename = filename
+        this.options = {
+            outputDir: options.outputDir ?? null,
+            filenameTemplate: options.filenameTemplate ?? null,
+            logger: options.logger ?? null,
+            pdfOptions: options.pdfOptions ?? {},
+        }
+        this.email = null
+        this.emailheader = null
+        this.textmessage = null
+        this.htmlmessage = null
+        this.attachments = []
+    }
 
-    this.getEnvelope = function() {
-        if (eml2pdf.email != undefined) return;
-        var data = fs.readFileSync(this.emlfilename);
-        data = data.toString();
-        if (data.indexOf("\r\n") === -1) {
-            // fix newlines in eml files from apple mail app
-            data = data.replace(/\n/gi,"\r\n");
+    _log(msg) {
+        if (this.options.logger) this.options.logger(msg)
+    }
+
+    getEnvelope() {
+        if (this.email != null) return
+        let data = fs.readFileSync(this.emlfilename).toString()
+        if (!data.includes('\r\n')) {
+            data = data.replace(/\n/g, '\r\n')
+        }
+        this.email = new Envelope(data)
+    }
+
+    getEmlPath() {
+        const dir = this.options.outputDir ?? path.dirname(this.emlfilename)
+        let basename
+        if (this.options.filenameTemplate) {
+            basename = sanitize(this.options.filenameTemplate({
+                date: this.email.header.get('date'),
+                from: this.email.header.get('from')[0],
+                subject: this.email.header.get('subject'),
+            }))
+        } else {
+            basename = sanitize(
+                dateFormat(this.email.header.get('date'), 'yyyy.mm.dd') + ' - '
+                + this.email.header.get('from')[0].name + ' - '
+                + this.email.header.get('subject')
+            )
+        }
+        return path.join(dir, basename)
+    }
+
+    async renameFile() {
+        this.getEnvelope()
+        let newname = this.getEmlPath()
+
+        if (this.emlfilename !== newname + '.eml') {
+            if (fs.existsSync(newname + '.eml')) {
+                let i = 1
+                while (fs.existsSync(`${newname}_${i}.eml`)) i++
+                newname = `${newname}_${i}`
+            }
+            fs.renameSync(this.emlfilename, newname + '.eml')
+            this.emlfilename = newname + '.eml'
         }
 
-        eml2pdf.email = new Envelope(data);
+        return newname
     }
 
-    this.getEmlPath = function() {
-        return path.dirname(eml2pdf.emlfilename) + "/"
-            + sanitize(
-                dateFormat(eml2pdf.email['header'].get('date'), "yyyy.mm.dd") + " - "
-                + eml2pdf.email['header'].get('from')[0].name + " - "
-                + eml2pdf.email['header'].get('subject')
-            );
-    }
-
-    this.renameFile = function() {
+    _parseEnvelope(envelope, callback) {
         return new Promise((resolve) => {
-            eml2pdf.getEnvelope();
+            let started = 0
+            let finished = 0
 
-            let newname = eml2pdf.getEmlPath();
+            const done = () => { if (started === finished) resolve() }
 
-            if (this.emlfilename !== newname + ".eml") {
-
-                if (fs.existsSync(newname + ".eml")) {
-                    let i = 1;
-                    while (fs.existsSync(newname + "_" + i + ".eml")) {
-                        i++;
-                    }
-                    newname = newname + "_" + i;
+            const iterate = (env) => {
+                if (env.header.get('content-type').type === undefined) {
+                    this.textmessage = env[0]
+                    done()
+                    return
                 }
 
-                fs.renameSync(this.emlfilename, newname + ".eml");
-                this.emlfilename = newname + ".eml";
-                resolve(newname);
-            } else {
-                this.emlfilename = newname + ".eml";
-                resolve(newname);
-            }
-        });
-    }
+                const { header: _, body: __, ...rest } = env
 
-    this.parseEnvelope = function(envelope,callback) {
-        return new Promise((resolveParseEnvelope) => {
-            let callbacksStarted = 0;
-            let callbacksProcessed = 0;
+                if (Object.keys(rest).length === 0) {
+                    started++
+                    callback(env).then(() => { finished++; done() })
+                    return
+                }
 
-
-
-            const done = function () {
-                if (callbacksStarted === callbacksProcessed) resolveParseEnvelope();
-            };
-            var iterator = function(envelope,callback) {
-                if (envelope.header.get('content-type').type === undefined) {
-                    // plaintext only mail with no Content-Type
-                    eml2pdf.textmessage = envelope[0];
-                    done();
-                } else {
-                    // Do not parse the header and body of the Envelope
-                    const {header: _, body: __, ...rest} = envelope;
-
-                    if (Object.keys(rest).length === 0) {
-                        // simple non-multipart envelope (text/plain or text/html, no child parts)
-                        callbacksStarted++;
-                        callback(envelope).then(function () {
-                            callbacksProcessed++;
-                            done();
-                        });
-                        return;
-                    }
-
-                    for (let prop in rest) {
-
-                        if (Object.keys(envelope).length > 2 && prop !== "body") {
-
-                            if (envelope[prop]['header'] !== undefined) {
-                                // if this Envelope contains more Envelopes
-                                if (envelope[prop]['0'] instanceof Envelope) {
-                                    iterator(envelope[prop], callback);
-                                } else {
-                                    callbacksStarted++;
-                                    // run callback when no child Envelopes in this Envelope
-                                    callback(envelope[prop]).then(function () {
-                                        callbacksProcessed++;
-                                        done();
-                                    });
-
-                                }
-                            } else {
-                                console.log("No header on this envelope prop:", prop)
-                                console.log(envelope[prop]);
-                            }
+                for (const prop of Object.keys(rest)) {
+                    if (env[prop]?.header !== undefined) {
+                        if (env[prop][0] instanceof Envelope) {
+                            iterate(env[prop])
                         } else {
-                            callback(envelope).then(function () {
-                                done();
-                            });
+                            started++
+                            callback(env[prop]).then(() => { finished++; done() })
                         }
                     }
                 }
-            };
-            iterator(envelope,callback);
-        });
-    };
+            }
 
-    this.saveAttachmentsFromEML = async () => {
-        await eml2pdf.getEnvelope();
-        await eml2pdf.parseEnvelope(eml2pdf.email,eml2pdf.checkForAttachment)
+            iterate(envelope)
+        })
     }
 
-    this.saveAttachmentsFromEML_old = function() {
-        return new Promise((resolve) => {
-            eml2pdf.getEnvelope();
-
-            eml2pdf.parseEnvelope(eml2pdf.email,eml2pdf.checkForAttachment).then(function() {
-                resolve();
-            });
-        });
-    };
-
-    this.checkForAttachment = function(envelope) {
-        return new Promise((resolve,reject) => {
-            debug(eml2pdf.attachments);
-            if (!["text/html", "text/plain", "multipart/related"].includes(envelope.header.get('content-type').type)) {
-                console.log("name", envelope.header);
-                var filename = envelope.header.get('content-disposition').parameters.filename;
-                var filepath = eml2pdf.getEmlPath() + "/";
-
-                if (!fs.existsSync(filepath)) {
-                    fs.mkdirSync(filepath);
-                }
-
-                fs.writeFile(filepath + filename, envelope.body.toString(), 'base64', function (err) {
-                    if (err) {
-                        console.log(err);
-                        reject();
-                    } else {
-                        resolve();
-                    }
-                });
-            } else {
-                resolve();
-            }
-        });
-    };
-
-     this.convertEMLtoPDF = function(){
-        return new Promise((resolve) => {
-            eml2pdf.getEnvelope();
-
-
-            function getMessagebyFormat(envelope) {
-                return new Promise((resolve) => {
-                    console.log("MIME type: "+JSON.stringify(envelope.header.get('content-type')));
-                    debug(envelope)
-                    switch (envelope.header.get('content-type').type) {
-                        case "text/plain":
-                            eml2pdf.textmessage = envelope.body.toString();
-                            break;
-                        case "text/html":
-                            eml2pdf.htmlmessage = envelope.body.toString();
-                            break;
-
-                        case "multipart/related":
-                            eml2pdf.htmlmessage = envelope[0].body.toString();
-                            break;
-
-                        case "image/png":
-                            eml2pdf.attachments.push({
-                                fileName: envelope.header.get('content-id'),
-                                contentId: envelope.header.get('content-id').replace('>', '').replace('<', ''),
-                                content: envelope.body.toString()
-                            })
-                            break;
-                        default:
-                            debug ("Unknown MIME type: "+envelope.header.get('content-type').type);
-                    }
-                    if (
-                        envelope.header.contentDisposition &&
-                        ["attachment", "inline"].includes(envelope.header.contentDisposition.mime) &&
-                        envelope['header']['contentId']
-                        ) {
-                        eml2pdf.attachments.push({
-                            fileName: envelope.header.get('content-type').name,
-                            contentId: envelope['header']['contentId'].replace('>', '').replace('<', ''),
-                            content: envelope['0']
-                        });
-                    }
-                    resolve();
-                });
-            }
-            if (eml2pdf.email.length > 1 && eml2pdf.email[1].length > 1) {
-                console.log(eml2pdf.email[1][0].body.toString())
-            }
-            // console.log(eml2pdf.email[1][1].body.toString());
-
-            eml2pdf.parseEnvelope(eml2pdf.email, getMessagebyFormat).then(() => {
-                let rawsource = "";
-                if (eml2pdf.htmlmessage === undefined) {
-                    debug("Falling back to txt version of message");
-                    // settle with plain text version of message
-                    rawsource = '<p>' + encode(eml2pdf.textmessage).replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>") + '</p>';
-                    ;
-                } else {
-                    // we have a formatted html message
-                    // inline images in the message
-                    rawsource = eml2pdf.inlineImages();
-                }
-                console.log(rawsource)
-                eml2pdf.generateEmailHeader();
-                var message = eml2pdf.emailheader;
-
-                message = message.concat(rawsource);
-
-                var options = {
-                    // format: 'A4',
-                    // zoomFactor: "1",
-                    width: "280mm", // * 4/3, // avoid pantomjs bug
-                    height: "396mm", // * 4/3 // avoid pantomjs bug
-                    border: "1cm"
-                };
-                let pdffilename = eml2pdf.emlfilename + ".pdf";
-
-                fs.writeFile(eml2pdf.emlfilename + ".txt", message, function(){});
-
-                eml2pdf.writepdffile(message, pdffilename, options).then((result) => {
-                    resolve(result);
-                });
-            });
-        });
-    };
-
-    this.generateEmailHeader = function() {
-        var source = `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif;font-size:15px;line-height: 1.3em">
-        <div>{{from}}</div>
-        <div style="font-size:12px;color:silver;">{{date}}</div>
-        <div style="font-size:12px;color:silver;">To: {{to}}</div>
-        {{#if cc}}
-        <div style="font-size:12px;color:silver;">Cc: {{cc}}</div>
-        {{/if}}
-        {{#if replyTo}}
-        <div style="font-size:12px;color:silver;">Reply-To: {{replyTo}}</div>
-        {{/if}}
-        <div style="font-size:12px;">{{subject}}</div>
-        <hr style="border:none; border-top:1px solid silver;">
-    </div>`;
-
-        var template = Handlebars.compile(source);
-        var data = {
-            from: eml2pdf.email.header.get('from')[0].address,
-            date: eml2pdf.email.header.get('date'),
-            to: eml2pdf.email.header.get('to')[0].address,
-            subject: eml2pdf.email.header.get('subject'),
-        };
-        const ccList = eml2pdf.email.header.get('cc');
-        if (ccList && ccList.length > 0) {
-            data.cc = ccList.map(c => c.address).join(', ');
-        }
-
-        const replyToList = eml2pdf.email.header.get('reply-to');
-        if (replyToList && replyToList.length > 0) {
-            data.replyTo = replyToList.map(c => c.address).join(', ');
-        }
-
-        eml2pdf.emailheader = template(data);
+    async saveAttachmentsFromEML() {
+        this.getEnvelope()
+        await this._parseEnvelope(this.email, (env) => this._checkForAttachment(env))
     }
 
-    this.inlineImages = function() {
-        debug("Number of attachments for this message: "+eml2pdf.attachments.length);
-        if (eml2pdf.attachments.length > 0){
-            return cid(eml2pdf.htmlmessage, eml2pdf.attachments.map((attachment, i) => ({ ...attachment, fileName: attachment.fileName || i.toString() })));
-        } else {
-            return eml2pdf.htmlmessage;
-        }
-    };
-
-    this.writepdffile = function(html,pdffilename,options) {
+    _checkForAttachment(envelope) {
         return new Promise((resolve, reject) => {
-            // Generate PDF
-            pdf.create(html, options).toFile(pdffilename, function (err, res) {
-                if (err) return reject(err);
-                resolve(res);
-            });
-        });
+            const type = envelope.header.get('content-type').type
+
+            if (['text/html', 'text/plain', 'multipart/related'].includes(type)) {
+                resolve()
+                return
+            }
+
+            const disposition = envelope.header.get('content-disposition')
+            const filename = disposition?.parameters?.filename
+                ?? envelope.header.get('content-type')?.name
+
+            if (!filename) {
+                this._log(`Skipping attachment with no filename (type: ${type})`)
+                resolve()
+                return
+            }
+
+            const dir = this.getEmlPath()
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+
+            fs.writeFile(path.join(dir, filename), envelope.body.toString(), 'base64', (err) => {
+                if (err) { console.error(err); reject(err) } else resolve()
+            })
+        })
+    }
+
+    async convertEMLtoPDF() {
+        this.getEnvelope()
+        this.attachments = []
+        this.htmlmessage = undefined
+        this.textmessage = undefined
+
+        await this._parseEnvelope(this.email, (env) => this._getMessageByFormat(env))
+
+        let rawsource
+        if (this.htmlmessage === undefined) {
+            this._log('Falling back to plain text version')
+            rawsource = '<p>' + encode(this.textmessage).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') + '</p>'
+        } else {
+            rawsource = this._inlineImages()
+        }
+
+        this.generateEmailHeader()
+        const html = this.emailheader + rawsource
+        const pdffilename = this.emlfilename + '.pdf'
+
+        return this._writepdffile(html, pdffilename)
+    }
+
+    _getMessageByFormat(envelope) {
+        return new Promise((resolve) => {
+            const contentType = envelope.header.get('content-type')
+            this._log('MIME type: ' + contentType.type)
+
+            switch (contentType.type) {
+                case 'text/plain':
+                    this.textmessage = envelope.body.toString()
+                    break
+                case 'text/html':
+                    this.htmlmessage = envelope.body.toString()
+                    break
+                case 'multipart/related':
+                    this.htmlmessage = envelope[0].body.toString()
+                    break
+                default:
+                    if (contentType.type?.startsWith('image/')) {
+                        const contentId = envelope.header.get('content-id')
+                        this.attachments.push({
+                            fileName: contentId,
+                            contentId: contentId?.replace(/[<>]/g, ''),
+                            content: envelope.body.toString(),
+                        })
+                    } else {
+                        this._log('Unknown MIME type: ' + contentType.type)
+                    }
+            }
+
+            if (
+                envelope.header.contentDisposition &&
+                ['attachment', 'inline'].includes(envelope.header.contentDisposition.mime) &&
+                envelope.header.contentId
+            ) {
+                this.attachments.push({
+                    fileName: contentType.name,
+                    contentId: envelope.header.contentId.replace(/[<>]/g, ''),
+                    content: envelope[0],
+                })
+            }
+
+            resolve()
+        })
+    }
+
+    generateEmailHeader() {
+        const esc = (s) => encode(String(s ?? ''))
+
+        const from = esc(this.email.header.get('from')[0].address)
+        const date = esc(this.email.header.get('date'))
+        const to = esc(this.email.header.get('to')[0].address)
+        const subject = esc(this.email.header.get('subject'))
+
+        const ccList = this.email.header.get('cc')
+        const cc = ccList?.length ? ccList.map(c => esc(c.address)).join(', ') : null
+
+        const replyToList = this.email.header.get('reply-to')
+        const replyTo = replyToList?.length ? replyToList.map(c => esc(c.address)).join(', ') : null
+
+        this.emailheader = `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif;font-size:15px;line-height: 1.3em">
+        <div>${from}</div>
+        <div style="font-size:12px;color:silver;">${date}</div>
+        <div style="font-size:12px;color:silver;">To: ${to}</div>
+        ${cc ? `<div style="font-size:12px;color:silver;">Cc: ${cc}</div>` : ''}
+        ${replyTo ? `<div style="font-size:12px;color:silver;">Reply-To: ${replyTo}</div>` : ''}
+        <div style="font-size:12px;">${subject}</div>
+        <hr style="border:none; border-top:1px solid silver;">
+    </div>`
+    }
+
+    _inlineImages() {
+        this._log(`Inlining ${this.attachments.length} image(s)`)
+        if (this.attachments.length > 0) {
+            return cid(this.htmlmessage, this.attachments.map((a, i) => ({
+                ...a,
+                fileName: a.fileName || String(i),
+            })))
+        }
+        return this.htmlmessage
+    }
+
+    async _writepdffile(html, filename) {
+        const options = { ...DEFAULT_PDF_OPTIONS, ...this.options.pdfOptions }
+        const browser = await puppeteer.launch()
+        try {
+            const page = await browser.newPage()
+            await page.setContent(html, { waitUntil: 'networkidle0' })
+            await page.pdf({ path: filename, ...options })
+        } finally {
+            await browser.close()
+        }
+        return { filename }
     }
 }

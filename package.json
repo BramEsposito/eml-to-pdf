@@ -7,11 +7,9 @@
   "dependencies": {
     "dateformat": "^5.0.3",
     "envelope": "^2.1.0",
-    "handlebars": "^4.7.8",
     "html-entities": "^2.5.2",
-    "html-pdf": "^3.0.1",
     "npm-cid": "^0.1.4",
-    "path": "^0.12.7",
+    "puppeteer": "^24.42.0",
     "sanitize-filename": "^1.6.3"
   },
   "scripts": {
